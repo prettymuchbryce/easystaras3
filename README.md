@@ -1,6 +1,6 @@
 # EasyStarAS3
 
-[![Example](http://prettymuchbryce.com/easystar.jpg)
+![Example](http://prettymuchbryce.com/easystar.jpg)
 
 EasyStarAS3 is a simple AStar API that helps you find your way around walls in your tile-based game. Basically, it gives you the shortest path without running your character through walls.
 
