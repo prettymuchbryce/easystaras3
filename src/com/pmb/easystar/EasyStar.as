@@ -26,8 +26,10 @@ package com.pmb.easystar
 		
 		protected var _calculationsThisFrame:uint;
 		protected var _calculationsPerFrame:uint;
-		protected var _startCoordinate:Point;
-		protected var _endCoordinate:Point;
+		protected var _startCoordinateX:uint;
+		protected var _startCoordinateY:uint
+		protected var _endCoordinateX:uint;
+		protected var _endCoordinateY:uint;
 		protected var _pathFound:Boolean;
 		public function EasyStar(){_pathFound = true;}
 		public function setCollisionGrid(value:Vector.<Vector.<uint>>):void {
@@ -35,14 +37,20 @@ package com.pmb.easystar
 		}
 		public function calculatePath(startCoordinate:Point,endCoordinate:Point,calculationsPerFrame:uint = 200):void {
 			if (!_collisionGrid) throw new Error("Can't caculate a path without a grid. Use setGrid first.");
-			if (startCoordinate.x<0||startCoordinate.y<0||endCoordinate.x<0||endCoordinate.y<0||startCoordinate.x>_collisionGrid[0].length-1||startCoordinate.y>_collisionGrid.length-1||endCoordinate.x>_collisionGrid[9].length||startCoordinate.y>_collisionGrid.length-1) {
+
+			_startCoordinateX = startCoordinate.x;
+			_startCoordinateY = startCoordinate.y;
+			_endCoordinateX = endCoordinate.x;
+			_endCoordinateY = endCoordinate.y;
+			
+			if (_startCoordinateX<0||_startCoordinateY<0||_endCoordinateX<0||_endCoordinateY<0||_startCoordinateX>_collisionGrid[0].length-1||_startCoordinateY>_collisionGrid.length-1||_endCoordinateX>_collisionGrid[0].length-1||_endCoordinateY>_collisionGrid.length-1) {
 				throw new Error("Your start or end point is outside the scope of your grid.");
 				return;
-			} else if (startCoordinate.equals(endCoordinate)) {
+			} else if (_startCoordinateX==_endCoordinateX&&_startCoordinateY==_endCoordinateY) {
 				throw new Error("Your start and end point are the same. You should really be catching this before you send a calculatePath to EasyStar.");
 				return;
 			}
-			if (_collisionGrid[endCoordinate.y][endCoordinate.x]==1) {
+			if (_collisionGrid[_endCoordinateY][_endCoordinateX]>=1) {
 				dispatchEvent(new PathNotFoundEvent());
 				return;
 			}
@@ -50,10 +58,8 @@ package com.pmb.easystar
 			_openList = new Vector.<Node>;
 			_pathFound = false;
 			
-			_startCoordinate = startCoordinate;
-			_endCoordinate = endCoordinate;
 			_calculationsPerFrame = calculationsPerFrame;
-			_openList.push(coordinateToNode(startCoordinate,null));
+			_openList.push(coordinateToNode(_startCoordinateX,_startCoordinateY,null));
 		}
 		public function calculate():void {
 			if (!_collisionGrid||_pathFound) return;
@@ -69,19 +75,19 @@ package com.pmb.easystar
 				}
 				var searchNode:Node = _openList[0];
 			
-				if (searchNode.coordinate.y > 0) {
+				if (searchNode.coordinateY > 0) {
 					checkAdjacentNode(searchNode,0,-1);
 					if (_pathFound) return;
 				}
-				if (searchNode.coordinate.x < _collisionGrid[0].length-1) {
+				if (searchNode.coordinateX < _collisionGrid[0].length-1) {
 					checkAdjacentNode(searchNode,+1,0);
 					if (_pathFound) return;
 				}
-				if (searchNode.coordinate.y < _collisionGrid.length-1) {
+				if (searchNode.coordinateY < _collisionGrid.length-1) {
 					checkAdjacentNode(searchNode,0,+1);
 					if (_pathFound) return;
 				}
-				if (searchNode.coordinate.x > 0) {
+				if (searchNode.coordinateX > 0) {
 					checkAdjacentNode(searchNode,-1,0);
 					if (_pathFound) return;
 				}
@@ -99,24 +105,26 @@ package com.pmb.easystar
 			return 1;
 		}
 		protected function checkAdjacentNode(searchNode:Node,x:int,y:int):void {
-			var adjacentCoordinate:Point = new Point(searchNode.coordinate.x+x,searchNode.coordinate.y+y);
-			if (_endCoordinate.x==adjacentCoordinate.x&&_endCoordinate.y==adjacentCoordinate.y) {
+			//var adjacentCoordinate:Point = new Point(searchNode.coordinateX+x,searchNode.coordinateY+y);
+			var adjacentCoordinateX:uint = searchNode.coordinateX+x;
+			var adjacentCoordinateY:uint = searchNode.coordinateY+y;
+			if (_endCoordinateX==adjacentCoordinateX&&_endCoordinateY==adjacentCoordinateY) {
 			
 				_pathFound = true;
 				var path:Vector.<Point> = new Vector.<Point>();
-				path.push(adjacentCoordinate);
-				path.push(searchNode.coordinate);
+				path.push(new Point(adjacentCoordinateX,adjacentCoordinateY));
+				path.push(new Point(searchNode.coordinateX,searchNode.coordinateY));
 				var parent:Node = searchNode.parent;
 				while (parent!=null) {
-					path.push(parent.coordinate);
+					path.push(new Point(parent.coordinateX,parent.coordinateY));
 					parent = parent.parent;
 				}
 				path.reverse();
 				dispatchEvent(new PathFoundEvent(path));
 				return;
 			}
-			if (_collisionGrid[adjacentCoordinate.y][adjacentCoordinate.x]==0) {
-				var node:Node = coordinateToNode(adjacentCoordinate,searchNode);
+			if (_collisionGrid[adjacentCoordinateY][adjacentCoordinateX]==0) {
+				var node:Node = coordinateToNode(adjacentCoordinateX,adjacentCoordinateY,searchNode);
 				if (!node.list) {
 					node.list = node.OPEN_LIST;
 					_openList.push(node);
@@ -128,19 +136,19 @@ package com.pmb.easystar
 				}
 			}
 		}
-		protected function coordinateToNode(coordinate:Point,parent:Node):Node {
+		protected function coordinateToNode(coordinateX:uint,coordinateY:uint,parent:Node):Node {
 			//Lets first check to see if we already have this coordinate saved as a node in our dictionary.
-			if (_nodeDictionary[coordinate.x+"_"+coordinate.y]) return _nodeDictionary[coordinate.x+"_"+coordinate.y];
+			if (_nodeDictionary[coordinateX+"_"+coordinateY]) return _nodeDictionary[coordinateX+"_"+coordinateY];
 			
-			var G:uint = getSimpleDistance(coordinate,_endCoordinate);
+			var G:uint = getSimpleDistance(coordinateX,coordinateY,_endCoordinateX,_endCoordinateY);
 			if (parent) var H:uint = parent.H+_straightCost; else H=G;
 			
-			var node:Node = new Node(parent,coordinate,G,H);
-			_nodeDictionary[coordinate.x+"_"+coordinate.y] = node;
+			var node:Node = new Node(parent,coordinateX,coordinateY,G,H);
+			_nodeDictionary[coordinateX+"_"+coordinateY] = node;
 			return node;
 		}
-		protected function getSimpleDistance(coordinateA:Point,coordinateB:Point):uint {
-			return Math.abs(coordinateA.x - coordinateB.x)*_straightCost + Math.abs(coordinateA.y - coordinateB.y)*_straightCost;
+		protected function getSimpleDistance(coordinateAX:uint,coordinateAY:uint,coordinateBX:uint,coordinateBY:uint):uint {
+			return Math.abs(coordinateAX - coordinateBX)*_straightCost + Math.abs(coordinateAY - coordinateBY)*_straightCost;
 		}
 	}
 }
