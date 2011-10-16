@@ -21,20 +21,19 @@ EasyStarAS3 only has 3 methods that you need to worry about
 
 Check out the example file for a better simple working example.
 
-	import com.pmb.easystar.EasyStar;
-	import com.pmb.easystar.events.*;
-
-	public var myCollisionGrid:Vector.<Vector.<uint>>;
 	public class EasyStarTest extends Sprite
 	{
+		public var myCollisionGrid:Vector.<Vector.<uint>>;
 		public function EasyStarTest():void {
 			var easyStar:EasyStar = new EasyStar();
 		
 			easyStar.addEventListener(PathFoundEvent.EVENT,onPathFound);
 			easyStar.addEventListener(PathNotFoundEvent.EVENT,onNoPathFound);
 
-			//Create your collision grid however you like
+			//Create your collision grid however you like here
+
 			easyStar.setCollisionGrid(myCollisionGrid);
+		
 			easyStar.calculatePath(myStartPoint,myEndPoint);
 		
 			addEventListener(Event.ENTER_FRAME,onEnterFrame);
@@ -43,8 +42,6 @@ Check out the example file for a better simple working example.
 			easyStar.calculate();
 		}
 		public function onPathFound(e:PathFoundEvent):void {
-			//e.path is a vector of points 
-			// with the first point being your start point and the last being your end point
 			trace("My path was found.. heres how I get there:");
 			for (var i:int = 0; i < e.path.length; i++) {
 				trace (e.path[i]);
