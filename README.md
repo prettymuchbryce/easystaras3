@@ -1,10 +1,11 @@
 # EasyStarAS3
 
-[![Example](http://prettymuchbryce.com/easystar.jpg)]
+[!(http://prettymuchbryce.com/easystar.jpg)]
 
-EasyStarAS3 is a simple A* API that helps you find your way around walls in your tile-based game by giving you the shortest path from two points.
+EasyStarAS3 is a simple AStar API that helps you find your way around walls in your tile-based game. Basically, it gives you the shortest path without running your character through walls.
 
-EasyStarAS3 only has 3 methods that you need to worry about
+EasyStarAS3 really only has 3 methods that you need to worry about
+
 	easyStar.setCollisionGrid(collisionGrid:Vector.<Vector.<uint>>);
 	easyStar.calculatePath(startPoint:Point,endPoint:Point,calculationsPerFrame:uint);
 	easyStar.calculate();
