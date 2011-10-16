@@ -1,6 +1,7 @@
 package
 {
 	import com.greensock.TweenMax;
+	import com.greensock.easing.Linear;
 	import com.pmb.easystar.EasyStar;
 	import com.pmb.easystar.events.PathFoundEvent;
 	import com.pmb.easystar.events.PathNotFoundEvent;
@@ -90,19 +91,21 @@ package
 		}
 		protected function onClick(event:Event):void
 		{
-			TweenMax.killTweensOf(_player,true);
+			TweenMax.killTweensOf(_player);
 			var tileClicked:Point = new Point(Math.floor(mouseX/_tileSize),Math.floor(mouseY/_tileSize));
 			
 			//You can tell easystar how many calculations you want it to make per frame.
 			//If you are doing too many calculations then your game could slow down
 			//This is especially true if you have more than a few objects trying to find paths at once or you have a huge map
-			_easyStar.calculatePath(new Point(_playerX,_playerY),tileClicked,10);
+			var playerPoint:Point = new Point(_playerX,_playerY);
+			if (playerPoint.equals(tileClicked)) return;
+			_easyStar.calculatePath(playerPoint,tileClicked,100);
 		}
 		protected function traversePath(path:Vector.<Point>):void {
 			if (path==null||path.length==0) return;
 			_playerX = path[0].x;
 			_playerY = path[0].y;
-			TweenMax.to(_player,.3,{x:path[0].x*_tileSize,y:path[0].y*_tileSize,onComplete:traversePath,onCompleteParams:new Array(path)});
+			TweenMax.to(_player,.15,{x:path[0].x*_tileSize,y:path[0].y*_tileSize,onComplete:traversePath,onCompleteParams:new Array(path),ease:Linear.easeNone});
 			path.shift();
 		}
 		public function drawScreen():void {
@@ -118,7 +121,6 @@ package
 					}
 				}
 			}
-		//	_buffer2.alpha = .5;
 		}
 	}
 }
