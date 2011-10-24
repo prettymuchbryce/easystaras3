@@ -1,11 +1,11 @@
 package com.pmb.easystar
 {
 	import com.pmb.easystar.events.PathFoundEvent;
+	import com.pmb.easystar.events.PathNotFoundEvent;
 	
 	import flash.events.EventDispatcher;
 	import flash.geom.Point;
 	import flash.utils.Dictionary;
-	import com.pmb.easystar.events.PathNotFoundEvent;
 
 	/*
 	EasyStarAS3
@@ -105,11 +105,9 @@ package com.pmb.easystar
 			return 1;
 		}
 		protected function checkAdjacentNode(searchNode:Node,x:int,y:int):void {
-			//var adjacentCoordinate:Point = new Point(searchNode.coordinateX+x,searchNode.coordinateY+y);
 			var adjacentCoordinateX:uint = searchNode.coordinateX+x;
 			var adjacentCoordinateY:uint = searchNode.coordinateY+y;
 			if (_endCoordinateX==adjacentCoordinateX&&_endCoordinateY==adjacentCoordinateY) {
-			
 				_pathFound = true;
 				var path:Vector.<Point> = new Vector.<Point>();
 				path.push(new Point(adjacentCoordinateX,adjacentCoordinateY));
@@ -124,14 +122,14 @@ package com.pmb.easystar
 				return;
 			}
 			if (_collisionGrid[adjacentCoordinateY][adjacentCoordinateX]==0) {
-				var node:Node = coordinateToNode(adjacentCoordinateX,adjacentCoordinateY,searchNode);
-				if (!node.list) {
-					node.list = node.OPEN_LIST;
-					_openList.push(node);
-				} else if (node.list==node.OPEN_LIST) {
-					if (searchNode.G+_straightCost<node.G) {
-						node.G = searchNode.G+_straightCost;
-						node.parent = searchNode;
+				var adjacentNode:Node = coordinateToNode(adjacentCoordinateX,adjacentCoordinateY,searchNode);
+				if (!adjacentNode.list) {
+					adjacentNode.list = adjacentNode.OPEN_LIST;
+					_openList.push(adjacentNode);
+				} else if (adjacentNode.list==adjacentNode.OPEN_LIST) {
+					if (searchNode.G+_straightCost<adjacentNode.G) {
+						adjacentNode.G = searchNode.G+_straightCost;
+						adjacentNode.parent = searchNode;
 					}
 				}
 			}
@@ -140,8 +138,8 @@ package com.pmb.easystar
 			//Lets first check to see if we already have this coordinate saved as a node in our dictionary.
 			if (_nodeDictionary[coordinateX+"_"+coordinateY]) return _nodeDictionary[coordinateX+"_"+coordinateY];
 			
-			var G:uint = getSimpleDistance(coordinateX,coordinateY,_endCoordinateX,_endCoordinateY);
-			if (parent) var H:uint = parent.H+_straightCost; else H=G;
+			var H:uint = getSimpleDistance(coordinateX,coordinateY,_endCoordinateX,_endCoordinateY);
+			if (parent) var G:uint = parent.G+_straightCost; else G=H;
 			
 			var node:Node = new Node(parent,coordinateX,coordinateY,G,H);
 			_nodeDictionary[coordinateX+"_"+coordinateY] = node;
