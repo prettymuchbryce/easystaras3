@@ -31,6 +31,7 @@ package com.pmb.easystar
 		protected var _endCoordinateX:uint;
 		protected var _endCoordinateY:uint;
 		protected var _pathFound:Boolean;
+		protected var _openListLen:uint;
 		public function EasyStar(){_pathFound = true;}
 		public function setCollisionGrid(value:Vector.<Vector.<uint>>):void {
 			_collisionGrid = value;
@@ -38,6 +39,7 @@ package com.pmb.easystar
 		public function calculatePath(startCoordinate:Point,endCoordinate:Point,calculationsPerFrame:uint = 200):void {
 			if (!_collisionGrid) throw new Error("Can't caculate a path without a grid. Use setGrid first.");
 
+			_openListLen = 0;
 			_startCoordinateX = startCoordinate.x;
 			_startCoordinateY = startCoordinate.y;
 			_endCoordinateX = endCoordinate.x;
@@ -55,25 +57,39 @@ package com.pmb.easystar
 				return;
 			}
 			_nodeDictionary = new Dictionary();
-			_openList = new Vector.<Node>;
+			_openList = new Vector.<Node>();
 			_pathFound = false;
 			
 			_calculationsPerFrame = calculationsPerFrame;
-			_openList.push(coordinateToNode(_startCoordinateX,_startCoordinateY,null));
+			addToOpenList(coordinateToNode(_startCoordinateX,_startCoordinateY,null));
+		}
+		public function addToOpenList(n:Node):void {
+			_openListLen++;
+			_openList[_openListLen-1] = n;
 		}
 		public function calculate():void {
 			if (!_collisionGrid||_pathFound) return;
 			_calculationsThisFrame = 0;
 			while ( _calculationsThisFrame < _calculationsPerFrame && _pathFound==false) {
-				//get next node in open list
-				_openList.sort(sortListByF);
+				var searchNode:Node;
+				var searchNodei:uint;
+				for (var i:int = 0; i < _openListLen; i++) {
+					if (i==0) {
+						searchNode = _openList[i];
+						searchNodei = i;
+					} else {
+						if (_openList[i].F<searchNode.F) {
+							searchNode = _openList[i];
+							searchNodei = i;
+						}
+					}
+				}
 				
-				if (_openList.length==0) {
+				if (_openListLen==0) {
 					dispatchEvent(new PathNotFoundEvent());
 					_pathFound = true;
 					return;
 				}
-				var searchNode:Node = _openList[0];
 			
 				if (searchNode.coordinateY > 0) {
 					checkAdjacentNode(searchNode,0,-1);
@@ -93,16 +109,10 @@ package com.pmb.easystar
 				}
 			
 				searchNode.list = searchNode.CLOSED_LIST;
-				_openList.shift();
+				_openList[searchNodei] = _openList[_openListLen-1];
+				_openListLen--;
 				_calculationsThisFrame++;
 			}
-		}
-		
-		private function sortListByF(x:Node,y:Node):Number
-		{
-			if (x.F<y.F) return -1;
-			else if (x.F==y.F) return 0;
-			return 1;
 		}
 		protected function checkAdjacentNode(searchNode:Node,x:int,y:int):void {
 			var adjacentCoordinateX:uint = searchNode.coordinateX+x;
@@ -110,11 +120,15 @@ package com.pmb.easystar
 			if (_endCoordinateX==adjacentCoordinateX&&_endCoordinateY==adjacentCoordinateY) {
 				_pathFound = true;
 				var path:Vector.<Point> = new Vector.<Point>();
-				path.push(new Point(adjacentCoordinateX,adjacentCoordinateY));
-				path.push(new Point(searchNode.coordinateX,searchNode.coordinateY));
+				var pathLen:uint = 0;
+				path[pathLen] = new Point(adjacentCoordinateX,adjacentCoordinateY);
+				pathLen++;
+				path[pathLen] = new Point(searchNode.coordinateX,searchNode.coordinateY);
+				pathLen++;
 				var parent:Node = searchNode.parent;
 				while (parent!=null) {
-					path.push(new Point(parent.coordinateX,parent.coordinateY));
+					path[pathLen] = new Point(parent.coordinateX,parent.coordinateY);
+					pathLen++;
 					parent = parent.parent;
 				}
 				path.reverse();
@@ -125,7 +139,7 @@ package com.pmb.easystar
 				var adjacentNode:Node = coordinateToNode(adjacentCoordinateX,adjacentCoordinateY,searchNode);
 				if (!adjacentNode.list) {
 					adjacentNode.list = adjacentNode.OPEN_LIST;
-					_openList.push(adjacentNode);
+					addToOpenList(adjacentNode);
 				} else if (adjacentNode.list==adjacentNode.OPEN_LIST) {
 					if (searchNode.G+_straightCost<adjacentNode.G) {
 						adjacentNode.G = searchNode.G+_straightCost;
@@ -135,7 +149,6 @@ package com.pmb.easystar
 			}
 		}
 		protected function coordinateToNode(coordinateX:uint,coordinateY:uint,parent:Node):Node {
-			//Lets first check to see if we already have this coordinate saved as a node in our dictionary.
 			if (_nodeDictionary[coordinateX+"_"+coordinateY]) return _nodeDictionary[coordinateX+"_"+coordinateY];
 			
 			var H:uint = getSimpleDistance(coordinateX,coordinateY,_endCoordinateX,_endCoordinateY);
