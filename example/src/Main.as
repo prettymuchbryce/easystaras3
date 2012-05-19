@@ -15,23 +15,21 @@ package
 	import flash.geom.Rectangle;
 
 	[SWF(width="960", height="640", frameRate="60", backgroundColor="#002143")]
-	public class Main extends Sprite
-	{
-		protected var _easyStar:EasyStar;
-		protected var _myGrid:Vector.<Vector.<uint>>;
+	public class Main extends Sprite {
+		private var _easyStar:EasyStar;
+		private var _myGrid:Vector.<Vector.<uint>>;
 		
-		protected var _tileSize:uint = 64;
-		protected var _mapWidth:uint = 15;
-		protected var _mapHeight:uint = 10;
+		private var _tileSize:uint = 64;
+		private var _mapWidth:uint = 15;
+		private var _mapHeight:uint = 10;
 		
-		protected var _buffer:Bitmap;
-		protected var _buffer2:Bitmap;
-		protected var _player:Sprite;
-		protected var _playerX:uint = 0;
-		protected var _playerY:uint = 0;
-		public function Main()
-		{
-			//Create an empty buffer to draw the grid onto
+		private var _buffer:Bitmap;
+		private var _buffer2:Bitmap;
+		private var _player:Sprite;
+		private var _playerX:uint = 0;
+		private var _playerY:uint = 0;
+		public function Main() {
+			 //Create an empty buffer to draw the grid onto
 			_buffer = new Bitmap(new BitmapData(stage.stageWidth,stage.stageHeight,false,0x0));
 			addChild(_buffer);
 			
@@ -47,7 +45,8 @@ package
 			addChild(_player);
 			
 			//Setup our collision grid.
-			//EasyStar takes a vector of Vector.<uint>'s where 0 is walkable and 1 is unwalkable
+			//EasyStar takes a vector of Vector.<uint>'s
+			//This could even be the same grid that you're using to visually represent which tiles should display... but this might be impractical for bigger games.
 			_myGrid = new Vector.<Vector.<uint>>();
 			for (var y:int = 0; y < _mapHeight; y++) _myGrid.push(new Vector.<uint>);
 			_myGrid[0].push(0,0,0,0,1,0,1,1,0,0,0,0,0,0,0);
@@ -64,10 +63,14 @@ package
 			//Draw this information to our bitmap
 			drawScreen();
 
+			//Lets let easy star know which tiles are okay to walk on. In our case its our 0's.
+			var acceptableTiles:Vector.<uint> = new Vector.<uint>();
+			acceptableTiles.push(0);
+			
 			
 			//Setup EasyStar, and give it our grid.
 			//Also add some events so we can know what to do when we find a path (or dont find one)
-			_easyStar = new EasyStar();
+			_easyStar = new EasyStar(acceptableTiles);
 			_easyStar.setCollisionGrid(_myGrid);
 			_easyStar.addEventListener(PathFoundEvent.EVENT,onPathFoundEvent);
 			_easyStar.addEventListener(PathNotFoundEvent.EVENT,onPathNotFoundEvent);
@@ -77,20 +80,19 @@ package
 			addEventListener(Event.ENTER_FRAME,onEnterFrame);
 		}
 		
-		protected function onPathNotFoundEvent(event:Event):void
+		private function onPathNotFoundEvent(event:Event):void
 		{
 			trace("No path was found!");
 		}
 		
-		protected function onPathFoundEvent(e:PathFoundEvent):void {
+		private function onPathFoundEvent(e:PathFoundEvent):void {
 			traversePath(e.path);
 		}
-		protected function onEnterFrame(event:Event):void
+		private function onEnterFrame(event:Event):void
 		{
 			_easyStar.calculate();
 		}
-		protected function onClick(event:Event):void
-		{
+		private function onClick(event:Event):void {
 			TweenMax.killTweensOf(_player);
 			var tileClicked:Point = new Point(Math.floor(mouseX/_tileSize),Math.floor(mouseY/_tileSize));
 			
@@ -98,11 +100,15 @@ package
 			//If you are doing too many calculations then your game could slow down
 			//This is especially true if you have more than a few objects trying to find paths at once or you have a huge map
 			var playerPoint:Point = new Point(_playerX,_playerY);
-			if (playerPoint.equals(tileClicked)) return;
-			_easyStar.calculatePath(playerPoint,tileClicked,100);
+			if (playerPoint.equals(tileClicked)) {
+				return;
+			}
+			_easyStar.setPath(playerPoint,tileClicked);
 		}
-		protected function traversePath(path:Vector.<Point>):void {
-			if (path==null||path.length==0) return;
+		private function traversePath(path:Vector.<Point>):void {
+			if (path==null||path.length==0) {
+				return;
+			}
 			_playerX = path[0].x;
 			_playerY = path[0].y;
 			TweenMax.to(_player,.15,{x:path[0].x*_tileSize,y:path[0].y*_tileSize,onComplete:traversePath,onCompleteParams:new Array(path),ease:Linear.easeNone});
@@ -111,9 +117,14 @@ package
 		public function drawScreen():void {
 			for (var y:int = 0; y < _mapHeight; y++) {
 				for (var x:int = 0; x < _mapWidth; x++) {
-					if ((x+y)%2) var offset:uint = 1;
-					else offset=0;
-					if (offset==0) _buffer2.bitmapData.fillRect(new Rectangle(x*_tileSize,y*_tileSize,_tileSize,_tileSize),0xFFFFFF);
+					if ((x+y)%2) {
+						var offset:uint = 1;
+					} else {
+						offset=0;
+					}
+					if (offset==0) {
+						_buffer2.bitmapData.fillRect(new Rectangle(x*_tileSize,y*_tileSize,_tileSize,_tileSize),0xFFFFFF);
+					}
 					if (_myGrid[y][x]==0) {
 						_buffer.bitmapData.fillRect(new Rectangle(x*_tileSize,y*_tileSize,_tileSize,_tileSize),0x00FF00);
 					} else {

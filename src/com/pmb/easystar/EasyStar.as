@@ -1,5 +1,4 @@
-package com.pmb.easystar
-{
+package com.pmb.easystar {
 	import com.pmb.easystar.events.PathFoundEvent;
 	import com.pmb.easystar.events.PathNotFoundEvent;
 	
@@ -7,70 +6,119 @@ package com.pmb.easystar
 	import flash.geom.Point;
 	import flash.utils.Dictionary;
 
-	/*
-	EasyStarAS3
-	Code By (@prettymuchbryce: brycedneal@gmail.com)
-	Code is blessed under the MIT License.
-	Based on Patrick Lester's "A* Pathfinder for Beginners": http://www.policyalmanac.org/games/aStarTutorial.htm
-	
-	_grid is a Vector of Vector<uint>'s containing 0 for walkable and 1 for unwalkable.
-	*/
-	public class EasyStar extends EventDispatcher
-	{
-		protected const _straightCost:uint = 10;
-		protected const _diagonalCost:uint = 14; //As of now there is no diagonal support
+	/**
+	 * EasyStarAS3
+	 * github.com/prettymuchbryce/EasyStarAS3
+	 * Blessed under the MIT License. 
+	 * 
+	 * 
+	 * Code By Bryce Neal
+	 * hi@prettymuchbryce.com
+	 * Based on Patrick Lester's "A* Pathfinding for beginners" http://www.policyalmanac.org/games/aStarTutorial.htm
+	 **/
+	public class EasyStar extends EventDispatcher {
+		private static const STRAIGHT_COST:uint = 10;
+		private static const DIAGONAL_COST:uint = 14; //As of now there is no diagonal support -- but this would roughly be the cost of a diagonal move
 		
-		protected var _collisionGrid:Vector.<Vector.<uint>>;
-		protected var _openList:Vector.<Node>;
-		protected var _nodeDictionary:Dictionary;
+		private var _collisionGrid:Vector.<Vector.<uint>>;
+		private var _openList:Vector.<Node>;
+		private var _nodeDictionary:Dictionary;
 		
-		protected var _calculationsThisFrame:uint;
-		protected var _calculationsPerFrame:uint;
-		protected var _startCoordinateX:uint;
-		protected var _startCoordinateY:uint
-		protected var _endCoordinateX:uint;
-		protected var _endCoordinateY:uint;
-		protected var _pathFound:Boolean;
-		protected var _openListLen:uint;
-		public function EasyStar(){_pathFound = true;}
-		public function setCollisionGrid(value:Vector.<Vector.<uint>>):void {
-			_collisionGrid = value;
+		private var _calculationsThisFrame:uint;
+		private var _iterationsPerCalculation:uint;
+		private var _startCoordinateX:uint;
+		private var _startCoordinateY:uint
+		private var _endCoordinateX:uint;
+		private var _endCoordinateY:uint;
+		private var _isDoneCalculating:Boolean;
+		private var _openListLen:uint;
+		private var _acceptableTiles:Vector.<uint>;
+		private var _pointsToAvoid:Dictionary;
+		
+		/**
+		 * @param acceptableTiles A vector of tiles that easyStar will deem as acceptable moves.
+		 * @param iterationsPerCalculation the number of iterations that easy star to will perform per calculate() call
+		 * @param pointsToAvoid This is an optional parameter. In addition to avoiding tiles that are not included in the acceptedTiles list, EasyStar will also avoid all points in this dictionary.
+		 * The dictionary should have a key where the x and y values are deliminated by an understcore like this: pointsToAvoid[25 + "_" + 21] = 1;
+		 * This would mean that the position 25,21 is considered an unacceptable move, even if the tile-type is in the acceptableTiles list.
+		 **/
+		public function EasyStar(acceptableTiles:Vector.<uint>, iterationsPerCalculation:uint = 200, pointsToAvoid:Dictionary = null) {
+			_acceptableTiles = acceptableTiles;
+			_pointsToAvoid = pointsToAvoid;
+			if (_pointsToAvoid == null) {
+				_pointsToAvoid = new Dictionary();
+			}
+			_iterationsPerCalculation = iterationsPerCalculation;
+			_isDoneCalculating = true;
 		}
-		public function calculatePath(startCoordinate:Point,endCoordinate:Point,calculationsPerFrame:uint = 200):void {
-			if (!_collisionGrid) throw new Error("Can't caculate a path without a grid. Use setGrid first.");
+
+		/**
+		 * Sets the collision grid that easy star uses.
+		 * 
+		 * @param collisionGrid The collision grid that this Easy Star instance will read from. This should be a vector of vector of uints where 0 is walkable and 1 is unwalkable.
+		 **/
+		public function setCollisionGrid(collisionGrid:Vector.<Vector.<uint>>):void {
+			_collisionGrid = collisionGrid;
+		}
+		
+		/**
+		 * Sets the start and end point that easy star will attempt to make a path from.
+		 * 
+		 * @param startCoordinate The x and y of the start point on the grid.
+		 * @param endCoordinate The x and y of the end point on the grid.
+		 * @param calculationsPerFrame How many calculations to perform per frame. If you want to try and find a solution instantly, then you should set this to a very high number.
+		 * 
+		 * Due to the flash's single threaded nature, a high number of calculations could slow down the performance of your app.
+		 **/
+		public function setPath(startCoordinate:Point,endCoordinate:Point):void {
+			if (!_collisionGrid) {
+				throw new Error("You can't set a path without first setting a grid. Use setGrid before you try to set a path.");
+			}
 
 			_openListLen = 0;
 			_startCoordinateX = startCoordinate.x;
 			_startCoordinateY = startCoordinate.y;
 			_endCoordinateX = endCoordinate.x;
 			_endCoordinateY = endCoordinate.y;
-			
+			_nodeDictionary = new Dictionary();
+			_openList = new Vector.<Node>();
+
 			if (_startCoordinateX<0||_startCoordinateY<0||_endCoordinateX<0||_endCoordinateY<0||_startCoordinateX>_collisionGrid[0].length-1||_startCoordinateY>_collisionGrid.length-1||_endCoordinateX>_collisionGrid[0].length-1||_endCoordinateY>_collisionGrid.length-1) {
 				throw new Error("Your start or end point is outside the scope of your grid.");
 				return;
 			} else if (_startCoordinateX==_endCoordinateX&&_startCoordinateY==_endCoordinateY) {
-				throw new Error("Your start and end point are the same. You should really be catching this before you send a calculatePath to EasyStar.");
+				dispatchEvent(new PathFoundEvent(new Vector.<Point>()));
 				return;
 			}
-			if (_collisionGrid[_endCoordinateY][_endCoordinateX]>=1) {
+			
+			//Checks to make sure your end point is a walkable tile.
+			var endTile:uint = _collisionGrid[_endCoordinateY][_endCoordinateX];
+			var isAcceptable:Boolean = false;
+			for (var i:uint = 0; i < _acceptableTiles.length; i++) {
+				if (endTile == _acceptableTiles[i]) {
+					isAcceptable = true;
+					break;
+				}
+			}
+			if (isAcceptable == false) {
 				dispatchEvent(new PathNotFoundEvent());
 				return;
 			}
-			_nodeDictionary = new Dictionary();
-			_openList = new Vector.<Node>();
-			_pathFound = false;
 			
-			_calculationsPerFrame = calculationsPerFrame;
-			addToOpenList(coordinateToNode(_startCoordinateX,_startCoordinateY,null));
+			_isDoneCalculating = false;
+			
+			addToOpenList(coordinateToNode(_startCoordinateX,_startCoordinateY,null,STRAIGHT_COST));
 		}
-		public function addToOpenList(n:Node):void {
-			_openListLen++;
-			_openList[_openListLen-1] = n;
-		}
+		
+		/**
+		 * This method does n iterations of calculations based on the calculationsPerFrame you specified during your path.
+		 **/
 		public function calculate():void {
-			if (!_collisionGrid||_pathFound) return;
+			if (!_collisionGrid||_isDoneCalculating) {
+				return;
+			}
 			_calculationsThisFrame = 0;
-			while ( _calculationsThisFrame < _calculationsPerFrame && _pathFound==false) {
+			while ( _calculationsThisFrame < _iterationsPerCalculation && !_isDoneCalculating) {
 				var searchNode:Node;
 				var searchNodei:uint;
 				for (var i:int = 0; i < _openListLen; i++) {
@@ -87,38 +135,52 @@ package com.pmb.easystar
 				
 				if (_openListLen==0) {
 					dispatchEvent(new PathNotFoundEvent());
-					_pathFound = true;
+					_isDoneCalculating = true;
 					return;
 				}
 			
 				if (searchNode.coordinateY > 0) {
-					checkAdjacentNode(searchNode,0,-1);
-					if (_pathFound) return;
+					checkAdjacentNode(searchNode,0,-1,STRAIGHT_COST);
+					if (_isDoneCalculating) {
+						return;
+					}
 				}
 				if (searchNode.coordinateX < _collisionGrid[0].length-1) {
-					checkAdjacentNode(searchNode,+1,0);
-					if (_pathFound) return;
+					checkAdjacentNode(searchNode,+1,0,STRAIGHT_COST);
+					if (_isDoneCalculating) {
+						return;
+					}
 				}
 				if (searchNode.coordinateY < _collisionGrid.length-1) {
-					checkAdjacentNode(searchNode,0,+1);
-					if (_pathFound) return;
+					checkAdjacentNode(searchNode,0,+1,STRAIGHT_COST);
+					if (_isDoneCalculating) {
+						return;
+					}
 				}
 				if (searchNode.coordinateX > 0) {
-					checkAdjacentNode(searchNode,-1,0);
-					if (_pathFound) return;
+					checkAdjacentNode(searchNode,-1,0,STRAIGHT_COST);
+					if (_isDoneCalculating) {
+						return;
+					}
 				}
 			
-				searchNode.list = searchNode.CLOSED_LIST;
+				searchNode.list = Node.CLOSED_LIST;
 				_openList[searchNodei] = _openList[_openListLen-1];
 				_openListLen--;
 				_calculationsThisFrame++;
 			}
 		}
-		protected function checkAdjacentNode(searchNode:Node,x:int,y:int):void {
+		
+		private function addToOpenList(n:Node):void {
+			_openListLen++;
+			_openList[_openListLen-1] = n;
+		}
+		
+		private function checkAdjacentNode(searchNode:Node,x:int,y:int, cost:uint):void {
 			var adjacentCoordinateX:uint = searchNode.coordinateX+x;
 			var adjacentCoordinateY:uint = searchNode.coordinateY+y;
 			if (_endCoordinateX==adjacentCoordinateX&&_endCoordinateY==adjacentCoordinateY) {
-				_pathFound = true;
+				_isDoneCalculating = true;
 				var path:Vector.<Point> = new Vector.<Point>();
 				var pathLen:uint = 0;
 				path[pathLen] = new Point(adjacentCoordinateX,adjacentCoordinateY);
@@ -135,31 +197,43 @@ package com.pmb.easystar
 				dispatchEvent(new PathFoundEvent(path));
 				return;
 			}
-			if (_collisionGrid[adjacentCoordinateY][adjacentCoordinateX]==0) {
-				var adjacentNode:Node = coordinateToNode(adjacentCoordinateX,adjacentCoordinateY,searchNode);
-				if (!adjacentNode.list) {
-					adjacentNode.list = adjacentNode.OPEN_LIST;
-					addToOpenList(adjacentNode);
-				} else if (adjacentNode.list==adjacentNode.OPEN_LIST) {
-					if (searchNode.G+_straightCost<adjacentNode.G) {
-						adjacentNode.G = searchNode.G+_straightCost;
-						adjacentNode.parent = searchNode;
+			if (_pointsToAvoid[adjacentCoordinateX + "_" + adjacentCoordinateY] == null) {
+				for (var i:int = 0; i < _acceptableTiles.length; i++) {
+					if (_collisionGrid[adjacentCoordinateY][adjacentCoordinateX] == _acceptableTiles[i]) {
+						var node:Node = coordinateToNode(adjacentCoordinateX, adjacentCoordinateY, searchNode, cost);
+						if (!node.list) {
+							node.list = Node.OPEN_LIST;
+							addToOpenList(node);
+						} else if (node.list == Node.OPEN_LIST) {
+							if (searchNode.G + cost < node.G) {
+								node.G = searchNode.G + cost;
+								node.parent = searchNode;
+							}
+						}
+						break;
 					}
 				}
 			}
 		}
-		protected function coordinateToNode(coordinateX:uint,coordinateY:uint,parent:Node):Node {
-			if (_nodeDictionary[coordinateX+"_"+coordinateY]) return _nodeDictionary[coordinateX+"_"+coordinateY];
+		
+		private function coordinateToNode(coordinateX:uint, coordinateY:uint, parent:Node, cost:uint):Node {
+			//Lets first check to see if we already have this coordinate saved as a node in our dictionary.
+			if (_nodeDictionary[coordinateX + "_" + coordinateY])
+				return _nodeDictionary[coordinateX + "_" + coordinateY];
 			
-			var H:uint = getSimpleDistance(coordinateX,coordinateY,_endCoordinateX,_endCoordinateY);
-			if (parent) var G:uint = parent.G+_straightCost; else G=H;
+			var H:uint = getDistance(coordinateX, coordinateY, _endCoordinateX, _endCoordinateY);
+			if (parent)
+				var G:uint = parent.G + cost;
+			else
+				G = H;
 			
-			var node:Node = new Node(parent,coordinateX,coordinateY,G,H);
-			_nodeDictionary[coordinateX+"_"+coordinateY] = node;
+			var node:Node = new Node(parent, coordinateX, coordinateY, G, H);
+			_nodeDictionary[coordinateX + "_" + coordinateY] = node;
 			return node;
 		}
-		protected function getSimpleDistance(coordinateAX:uint,coordinateAY:uint,coordinateBX:uint,coordinateBY:uint):uint {
-			return Math.abs(coordinateAX - coordinateBX)*_straightCost + Math.abs(coordinateAY - coordinateBY)*_straightCost;
+		
+		private function getDistance(x1:uint, x2:uint, y1:uint, y2:uint):uint {
+			return Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
 		}
-	}
+	}	
 }
