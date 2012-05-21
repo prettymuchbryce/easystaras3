@@ -1,6 +1,7 @@
 package com.pmb.easystar {
 	import com.pmb.easystar.events.PathFoundEvent;
 	import com.pmb.easystar.events.PathNotFoundEvent;
+	import com.pmb.priority.PriorityQueue;
 	
 	import flash.events.EventDispatcher;
 	import flash.geom.Point;
@@ -21,7 +22,7 @@ package com.pmb.easystar {
 		private static const DIAGONAL_COST:uint = 14; //As of now there is no diagonal support -- but this would roughly be the cost of a diagonal move
 		
 		private var _collisionGrid:Vector.<Vector.<uint>>;
-		private var _openList:Vector.<Node>;
+		private var _openList:PriorityQueue;
 		private var _nodeDictionary:Dictionary;
 		
 		private var _calculationsThisFrame:uint;
@@ -31,7 +32,6 @@ package com.pmb.easystar {
 		private var _endCoordinateX:uint;
 		private var _endCoordinateY:uint;
 		private var _isDoneCalculating:Boolean;
-		private var _openListLen:uint;
 		private var _acceptableTiles:Vector.<uint>;
 		private var _pointsToAvoid:Dictionary;
 		
@@ -75,13 +75,12 @@ package com.pmb.easystar {
 				throw new Error("You can't set a path without first setting a grid. Use setGrid before you try to set a path.");
 			}
 
-			_openListLen = 0;
 			_startCoordinateX = startCoordinate.x;
 			_startCoordinateY = startCoordinate.y;
 			_endCoordinateX = endCoordinate.x;
 			_endCoordinateY = endCoordinate.y;
 			_nodeDictionary = new Dictionary();
-			_openList = new Vector.<Node>();
+			_openList = new PriorityQueue("F",PriorityQueue.MIN_HEAP);
 
 			if (_startCoordinateX<0||_startCoordinateY<0||_endCoordinateX<0||_endCoordinateY<0||_startCoordinateX>_collisionGrid[0].length-1||_startCoordinateY>_collisionGrid.length-1||_endCoordinateX>_collisionGrid[0].length-1||_endCoordinateY>_collisionGrid.length-1) {
 				throw new Error("Your start or end point is outside the scope of your grid.");
@@ -107,7 +106,7 @@ package com.pmb.easystar {
 			
 			_isDoneCalculating = false;
 			
-			addToOpenList(coordinateToNode(_startCoordinateX,_startCoordinateY,null,STRAIGHT_COST));
+			_openList.insert(coordinateToNode(_startCoordinateX,_startCoordinateY,null,STRAIGHT_COST));
 		}
 		
 		/**
@@ -119,26 +118,15 @@ package com.pmb.easystar {
 			}
 			_calculationsThisFrame = 0;
 			while ( _calculationsThisFrame < _iterationsPerCalculation && !_isDoneCalculating) {
-				var searchNode:Node;
-				var searchNodei:uint;
-				for (var i:int = 0; i < _openListLen; i++) {
-					if (i==0) {
-						searchNode = _openList[i];
-						searchNodei = i;
-					} else {
-						if (_openList[i].F<searchNode.F) {
-							searchNode = _openList[i];
-							searchNodei = i;
-						}
-					}
-				}
-				
-				if (_openListLen==0) {
+
+				if (_openList.length==0) {
 					dispatchEvent(new PathNotFoundEvent());
 					_isDoneCalculating = true;
 					return;
 				}
-			
+				
+				var searchNode:Node = _openList.getHighestPriorityElement();
+
 				if (searchNode.coordinateY > 0) {
 					checkAdjacentNode(searchNode,0,-1,STRAIGHT_COST);
 					if (_isDoneCalculating) {
@@ -146,13 +134,13 @@ package com.pmb.easystar {
 					}
 				}
 				if (searchNode.coordinateX < _collisionGrid[0].length-1) {
-					checkAdjacentNode(searchNode,+1,0,STRAIGHT_COST);
+					checkAdjacentNode(searchNode,1,0,STRAIGHT_COST);
 					if (_isDoneCalculating) {
 						return;
 					}
 				}
 				if (searchNode.coordinateY < _collisionGrid.length-1) {
-					checkAdjacentNode(searchNode,0,+1,STRAIGHT_COST);
+					checkAdjacentNode(searchNode,0,1,STRAIGHT_COST);
 					if (_isDoneCalculating) {
 						return;
 					}
@@ -163,17 +151,10 @@ package com.pmb.easystar {
 						return;
 					}
 				}
-			
+				_openList.shiftHighestPriorityElement()
 				searchNode.list = Node.CLOSED_LIST;
-				_openList[searchNodei] = _openList[_openListLen-1];
-				_openListLen--;
 				_calculationsThisFrame++;
 			}
-		}
-		
-		private function addToOpenList(n:Node):void {
-			_openListLen++;
-			_openList[_openListLen-1] = n;
 		}
 		
 		private function checkAdjacentNode(searchNode:Node,x:int,y:int, cost:uint):void {
@@ -195,7 +176,6 @@ package com.pmb.easystar {
 				}
 				path.reverse();
 				dispatchEvent(new PathFoundEvent(path));
-				return;
 			}
 			if (_pointsToAvoid[adjacentCoordinateX + "_" + adjacentCoordinateY] == null) {
 				for (var i:int = 0; i < _acceptableTiles.length; i++) {
@@ -203,7 +183,7 @@ package com.pmb.easystar {
 						var node:Node = coordinateToNode(adjacentCoordinateX, adjacentCoordinateY, searchNode, cost);
 						if (!node.list) {
 							node.list = Node.OPEN_LIST;
-							addToOpenList(node);
+							_openList.insert(node);
 						} else if (node.list == Node.OPEN_LIST) {
 							if (searchNode.G + cost < node.G) {
 								node.G = searchNode.G + cost;
@@ -218,14 +198,16 @@ package com.pmb.easystar {
 		
 		private function coordinateToNode(coordinateX:uint, coordinateY:uint, parent:Node, cost:uint):Node {
 			//Lets first check to see if we already have this coordinate saved as a node in our dictionary.
-			if (_nodeDictionary[coordinateX + "_" + coordinateY])
+			if (_nodeDictionary[coordinateX + "_" + coordinateY]) {
 				return _nodeDictionary[coordinateX + "_" + coordinateY];
+			}
 			
 			var H:uint = getDistance(coordinateX, coordinateY, _endCoordinateX, _endCoordinateY);
-			if (parent)
+			if (parent) {
 				var G:uint = parent.G + cost;
-			else
+			} else {
 				G = H;
+			}
 			
 			var node:Node = new Node(parent, coordinateX, coordinateY, G, H);
 			_nodeDictionary[coordinateX + "_" + coordinateY] = node;

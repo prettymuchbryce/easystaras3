@@ -27,6 +27,9 @@ package com.pmb.easystar {
 			this.G = G;
 			this.H = H;
 		}
+		/**
+		 * Returns the F value. The F value is our best guess as to how far this node from the destination.
+		 **/
 		public function get F():uint {
 			return G+H;
 		}
