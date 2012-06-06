@@ -1,20 +1,25 @@
 package com.pmb.priority {
 	public class PriorityQueue {
-		public static const MAX_HEAP:String = "MAX_HEAP";
-		public static const MIN_HEAP:String = "MIN_HEAP";
+		public static const MAX_HEAP:uint = 0;
+		public static const MIN_HEAP:uint = 1;
 		private var _queue:Array;
 		private var _criteria:String;
 		private var _isMax:Boolean;
 		private var _length:uint = 0;
 		/**
-		 * This is a basic Priority Queue data type implementation that can be used to sort any object type.
-		 * It uses a technique called a binary heap and can be either min or max sorted.
+		 * This is an improved Priority Queue data type implementation that can be used to sort any object type.
+		 * It uses a technique called a binary heap for max sorts, and array.sortOn for min sorts.
+		 * 
+		 * For more information on why this priorityQueue works this way.. see the tests!
+		 * Array.sortOn is faster for min sorts, but a normal binary heap is faster for max sorts.
+		 * This is probably due to whatever sorting algorithm is doing under the covers of array.sortOn. (It's closed source -- so theres no way for us to know!)
+		 * 
 		 * For more on binary heaps see: http://en.wikipedia.org/wiki/Binary_heap
 		 * 
 		 * @param criteria The criteria by which to sort the objects. This should be a property of the objects you're sorting.
 		 * @param heapType either PriorityQueue.MAX_HEAP or PriorityQueue.MIN_HEAP.
 		 **/
-		public function PriorityQueue(criteria:String,heapType:String) {
+		public function PriorityQueue(criteria:String,heapType:uint) {
 			if (heapType==MAX_HEAP) {
 				_isMax = true;
 			} else if (heapType==MIN_HEAP) {
@@ -39,18 +44,21 @@ package com.pmb.priority {
 		}
 		/**
 		 * Returns the length of the heap.
+		 * @return the length of the heap
 		 **/
 		public function get length():uint {
 			return _length;
 		}
 		/**
 		 * Peeks at the highest priority element.
+		 * @return the highest priority element
 		 **/
 		public function getHighestPriorityElement():* {
 			return _queue[0];
 		}
 		/**
 		 * Removes and returns the highest priority element from the queue.
+		 * @return the highest priority element
 		 **/
 		public function shiftHighestPriorityElement():* {
 			if (_length < 0) {
