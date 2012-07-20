@@ -8,11 +8,7 @@ package com.pmb.priority {
 		private var _length:uint = 0;
 		/**
 		 * This is an improved Priority Queue data type implementation that can be used to sort any object type.
-		 * It uses a technique called a binary heap for max sorts, and array.sortOn for min sorts.
-		 * 
-		 * For more information on why this priorityQueue works this way.. see the tests!
-		 * Array.sortOn is faster for min sorts, but a normal binary heap is faster for max sorts.
-		 * This is probably due to whatever sorting algorithm is doing under the covers of array.sortOn. (It's closed source -- so theres no way for us to know!)
+		 * It uses a technique called a binary heap.
 		 * 
 		 * For more on binary heaps see: http://en.wikipedia.org/wiki/Binary_heap
 		 * 
